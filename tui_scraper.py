@@ -8,7 +8,7 @@ import urllib.parse
 
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, VerticalScroll, Vertical
-from textual.widgets import Header, Footer, Input, Button, Log, ProgressBar, Label
+from textual.widgets import Header, Footer, Input, Button, Log, ProgressBar, Label, Static
 from textual import work
 from textual.worker import Worker, get_current_worker
 
@@ -59,6 +59,22 @@ class TuiScraperApp(App):
     #progress {
         margin-bottom: 1;
     }
+    #thread-container {
+        height: auto;
+        border: solid gray;
+        margin-bottom: 1;
+        padding: 1;
+        background: $boost;
+    }
+    .thread-status {
+        width: 1fr;
+        color: $text;
+        text-style: dim;
+    }
+    .thread-status.active {
+        color: $success;
+        text-style: none;
+    }
     """
     
     BINDINGS = [
@@ -70,7 +86,11 @@ class TuiScraperApp(App):
         with Horizontal():
             yield ScraperConfigForm()
             with Vertical(id="log-container"):
+                yield Label("Overall Progress")
                 yield ProgressBar(id="progress", show_eta=True)
+                yield Label("Active Threads")
+                with VerticalScroll(id="thread-container"):
+                    pass # We will populate this dynamically based on thread count
                 yield Log(id="log_view", highlight=True)
         yield Footer()
 
@@ -116,6 +136,14 @@ class TuiScraperApp(App):
         self.query_one("#start-btn", Button).disabled = True
 
         self.log_view.clear()
+        
+        # Setup thread widgets
+        thread_container = self.query_one("#thread-container")
+        thread_container.remove_children()
+        for i in range(threads):
+            lbl = Static(f"Thread {i+1}: Idle", id=f"thread-{i}", classes="thread-status")
+            thread_container.mount(lbl)
+            
         self.log_view.write_line(f"Starting scrape for {system} in {rom_dir}...")
         
         self.run_scrape_worker(rom_dir, scrape_dir, system, user, password, devid, devpassword, systemeid, gamelist_dir, threads)
@@ -179,10 +207,40 @@ class TuiScraperApp(App):
 
         def safe_log(msg):
             self.call_from_thread(self.log_view.write_line, msg)
+            
+        def update_thread_status(thread_idx, text, active=True):
+            try:
+                def modify_lbl():
+                    lbl = app.query_one(f"#thread-{thread_idx}", Static)
+                    lbl.update(f"Thread {thread_idx+1}: {text}")
+                    if active:
+                        lbl.add_class("active")
+                    else:
+                        lbl.remove_class("active")
+                self.call_from_thread(modify_lbl)
+            except:
+                pass
+
+        # Use an index to assign tasks to our visual "threads"
+        thread_assignment_lock = threading.Lock()
+        thread_pool_registry = {} # mapping thread ID to 0-based index
+        next_thread_idx = 0
+        
+        def get_thread_display_idx():
+            nonlocal next_thread_idx
+            tid = threading.get_ident()
+            with thread_assignment_lock:
+                if tid not in thread_pool_registry:
+                    thread_pool_registry[tid] = next_thread_idx
+                    next_thread_idx += 1
+                return thread_pool_registry[tid]
 
         def process_rom_task(rom_name):
             if worker.is_cancelled:
                 return
+            
+            t_idx = get_thread_display_idx()
+            update_thread_status(t_idx, f"Processing {rom_name}...")
 
             base_name = os.path.splitext(rom_name)[0]
             info = fetch_game_info(rom_name, devid, devpassword, "mcScrapiscrape", user, password, systemeid)
@@ -278,6 +336,7 @@ class TuiScraperApp(App):
                 safe_log(f"  [!] Error parsing media for {rom_name}: {e}")
 
             update_progress()
+            update_thread_status(t_idx, "Idle", active=False)
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=threads) as executor:
             executor.map(process_rom_task, roms_to_scrape)
@@ -294,6 +353,11 @@ class TuiScraperApp(App):
             safe_log(f"\nSaved gamelist to {gl_path}")
 
         safe_log("\nScraping complete!")
+        for i in range(threads):
+            try:
+                self.call_from_thread(lambda idx=i: app.query_one(f"#thread-{idx}", Static).update(f"Thread {idx+1}: Finished"))
+            except:
+                pass
         self.call_from_thread(self.reset_ui)
 
     def setup_progress(self, total):
