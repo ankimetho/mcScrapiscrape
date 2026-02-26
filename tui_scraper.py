@@ -101,9 +101,9 @@ class TuiScraperApp(App):
         self.title = "mcScrapiscrape TUI"
         self.sub_title = "Press 'q' to quit"
 
-    def on_button_pressed(self, event: Button.Pressed) -> None:
+    async def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "start-btn":
-            self.start_scraping()
+            await self.start_scraping()
 
     def get_input_value(self, id: str) -> str:
         try:
@@ -111,7 +111,7 @@ class TuiScraperApp(App):
         except:
             return ""
 
-    def start_scraping(self):
+    async def start_scraping(self):
         rom_dir = self.get_input_value("rom-dir")
         scrape_dir = self.get_input_value("scrape-dir")
         system = self.get_input_value("system")
@@ -139,7 +139,7 @@ class TuiScraperApp(App):
         
         # Setup thread widgets
         thread_container = self.query_one("#thread-container")
-        thread_container.remove_children()
+        await thread_container.remove_children()
         for i in range(threads):
             lbl = Static(f"Thread {i+1}: Idle", id=f"thread-{i}", classes="thread-status")
             thread_container.mount(lbl)
