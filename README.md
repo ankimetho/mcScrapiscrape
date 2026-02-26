@@ -14,8 +14,29 @@
 - Python 3.x
 - A free account on [screenscraper.fr](https://www.screenscraper.fr/)
 - Screenscraper Developer API Credentials (`devid` and `devpassword`)
+- _(Optional)_ `textual` (For the graphical Terminal UI)
 
 ## Usage
+
+You can use the scraper either via a graphical terminal interface (TUI) or entirely from the command line.
+
+### Option 1: Graphical Terminal UI (TUI)
+
+If you prefer a visual interface, you can run the TUI wrapper. First, install the requirements:
+
+```bash
+pip install textual
+```
+
+Then, run:
+
+```bash
+python tui_scraper.py
+```
+
+This will open a full-screen, interactive graphical window where you can input all your variables and click "Start Scrape" to watch the progress bar and live logs!
+
+### Option 2: Command Line Interface (CLI)
 
 ```bash
 python scraper.py \
