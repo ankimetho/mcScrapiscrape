@@ -9,7 +9,7 @@ import json
 
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, VerticalScroll, Vertical
-from textual.widgets import Header, Footer, Input, Button, Log, ProgressBar, Label, Static
+from textual.widgets import Header, Footer, Input, Button, Log, ProgressBar, Label, Static, Select
 from textual import work
 from textual.worker import Worker, get_current_worker
 
@@ -31,7 +31,16 @@ class ScraperConfigForm(VerticalScroll):
         
         yield Label("Scrape Settings")
         yield Input(placeholder="System Name (e.g., snes, psx)", id="system")
-        yield Input(placeholder="System ID (e.g., 4)", id="systemeid")
+        
+        system_options = []
+        try:
+            with open("screenscraper_system_ids.json", "r") as f:
+                systems_data = json.load(f)
+                system_options = sorted([(f"{k.title()} ({v})", str(v)) for k, v in systems_data.items()])
+        except Exception:
+            pass
+            
+        yield Select(options=system_options, prompt="Select Screenscraper System ID", id="systemeid")
         yield Input(value="6", placeholder="Threads", id="threads", type="integer")
         
         yield Label("Directories")
@@ -126,7 +135,11 @@ class TuiScraperApp(App):
 
     def get_input_value(self, id: str) -> str:
         try:
-            return self.query_one(f"#{id}", Input).value.strip()
+            widget = self.query_one(f"#{id}")
+            if isinstance(widget, Select):
+                val = widget.value
+                return str(val) if val != Select.BLANK and val is not None else ""
+            return widget.value.strip()
         except:
             return ""
 
@@ -160,7 +173,8 @@ class TuiScraperApp(App):
                 
             for key, val in config_data.items():
                 try:
-                    self.query_one(f"#{key}", Input).value = str(val)
+                    widget = self.query_one(f"#{key}")
+                    widget.value = str(val)
                 except:
                     pass
             self.log_view.write_line("Successfully loaded config.json!")
@@ -189,6 +203,8 @@ class TuiScraperApp(App):
         # Disable UI
         for inp in self.query(Input):
             inp.disabled = True
+        for sel in self.query(Select):
+            sel.disabled = True
         self.query_one("#start-btn", Button).disabled = True
 
         self.log_view.clear()
@@ -423,6 +439,8 @@ class TuiScraperApp(App):
     def reset_ui(self):
         for inp in self.query(Input):
             inp.disabled = False
+        for sel in self.query(Select):
+            sel.disabled = False
         self.query_one("#start-btn", Button).disabled = False
 
 if __name__ == "__main__":
