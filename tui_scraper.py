@@ -5,6 +5,7 @@ from xml.dom import minidom
 import concurrent.futures
 import threading
 import urllib.parse
+import json
 
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, VerticalScroll, Vertical
@@ -17,7 +18,11 @@ from scraper import fetch_game_info, download_media, MEDIA_MAPPING
 
 class ScraperConfigForm(VerticalScroll):
     def compose(self) -> ComposeResult:
-        yield Button("Start Scrape", id="start-btn", variant="success")
+        with Horizontal(id="action-buttons"):
+            yield Button("Start Scrape", id="start-btn", variant="success")
+            yield Button("Save Config", id="save-btn", variant="primary")
+            yield Button("Load Config", id="load-btn")
+        
         yield Label("Screenscraper API Credentials")
         yield Input(placeholder="Screenscraper Username", id="user")
         yield Input(placeholder="Screenscraper Password", password=True, id="password")
@@ -75,6 +80,13 @@ class TuiScraperApp(App):
         color: $success;
         text-style: none;
     }
+    #action-buttons {
+        height: auto;
+        margin-bottom: 1;
+    }
+    #action-buttons Button {
+        margin-right: 1;
+    }
     """
     
     BINDINGS = [
@@ -100,16 +112,60 @@ class TuiScraperApp(App):
         self.xml_lock = threading.Lock()
         self.title = "mcScrapiscrape TUI"
         self.sub_title = "Press 'q' to quit"
+        
+        # Auto-load config on startup
+        self.call_after_refresh(self.load_config_file)
 
     async def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "start-btn":
             await self.start_scraping()
+        elif event.button.id == "save-btn":
+            self.save_config_file()
+        elif event.button.id == "load-btn":
+            self.load_config_file()
 
     def get_input_value(self, id: str) -> str:
         try:
             return self.query_one(f"#{id}", Input).value.strip()
         except:
             return ""
+
+    def save_config_file(self):
+        config_data = {
+            "rom-dir": self.get_input_value("rom-dir"),
+            "scrape-dir": self.get_input_value("scrape-dir"),
+            "system": self.get_input_value("system"),
+            "user": self.get_input_value("user"),
+            "password": self.get_input_value("password"),
+            "devid": self.get_input_value("devid"),
+            "devpassword": self.get_input_value("devpassword"),
+            "systemeid": self.get_input_value("systemeid"),
+            "gamelist-dir": self.get_input_value("gamelist-dir"),
+            "threads": self.get_input_value("threads")
+        }
+        try:
+            with open("config.json", "w") as f:
+                json.dump(config_data, f, indent=4)
+            self.log_view.write_line("Successfully saved config.json!")
+        except Exception as e:
+            self.log_view.write_line(f"[!] Error saving config: {e}")
+
+    def load_config_file(self):
+        if not os.path.exists("config.json"):
+            return
+            
+        try:
+            with open("config.json", "r") as f:
+                config_data = json.load(f)
+                
+            for key, val in config_data.items():
+                try:
+                    self.query_one(f"#{key}", Input).value = str(val)
+                except:
+                    pass
+            self.log_view.write_line("Successfully loaded config.json!")
+        except Exception as e:
+            self.log_view.write_line(f"[!] Error loading config.json: {e}")
 
     async def start_scraping(self):
         rom_dir = self.get_input_value("rom-dir")
