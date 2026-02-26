@@ -13,6 +13,7 @@
 
 - Python 3.x
 - A free account on [screenscraper.fr](https://www.screenscraper.fr/)
+- Screenscraper Developer API Credentials (`devid` and `devpassword`)
 
 ## Usage
 
@@ -23,6 +24,8 @@ python scraper.py \
   --system "snes" \
   --user "your_screenscraper_username" \
   --password "your_screenscraper_password" \
+  --devid "your_dev_id" \
+  --devpassword "your_dev_password" \
   --systemeid "4" \
   --gamelist-dir "/path/to/ES-DE/gamelists" \
   --threads 6
@@ -37,8 +40,8 @@ python scraper.py \
 | `--system`       | System name (e.g., `snes`, `megadrive`). Used for folder naming.                      |   Yes    | -                  |
 | `--user`         | Your Screenscraper account username.                                                  |   Yes    | -                  |
 | `--password`     | Your Screenscraper account password.                                                  |   Yes    | -                  |
-| `--devid`        | Screenscraper Developer ID (if applicable).                                           |    No    | `""`               |
-| `--devpassword`  | Screenscraper Developer Password.                                                     |    No    | `""`               |
+| `--devid`        | Screenscraper Developer ID.                                                           |   Yes    | `""`               |
+| `--devpassword`  | Screenscraper Developer Password.                                                     |   Yes    | `""`               |
 | `--softname`     | Software name registered with Screenscraper.                                          |    No    | `"mcScrapiscrape"` |
 | `--gamelist-dir` | Output directory to generate the `gamelist.xml` file.                                 |    No    | `None`             |
 | `--systemeid`    | Screenscraper system ID (e.g., 4 for SNES). **Strongly recommended** to avoid errors. |    No    | `None`             |
