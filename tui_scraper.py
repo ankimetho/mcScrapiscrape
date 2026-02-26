@@ -17,6 +17,7 @@ from scraper import fetch_game_info, download_media, MEDIA_MAPPING
 
 class ScraperConfigForm(VerticalScroll):
     def compose(self) -> ComposeResult:
+        yield Button("Start Scrape", id="start-btn", variant="success")
         yield Label("Screenscraper API Credentials")
         yield Input(placeholder="Screenscraper Username", id="user")
         yield Input(placeholder="Screenscraper Password", password=True, id="password")
@@ -26,16 +27,12 @@ class ScraperConfigForm(VerticalScroll):
         yield Label("Scrape Settings")
         yield Input(placeholder="System Name (e.g., snes, psx)", id="system")
         yield Input(placeholder="System ID (e.g., 4)", id="systemeid")
+        yield Input(value="6", placeholder="Threads", id="threads", type="integer")
         
         yield Label("Directories")
         yield Input(placeholder="ROM Directory (e.g., /path/to/roms/snes)", id="rom-dir")
         yield Input(placeholder="ES-DE Downloaded Media Directory", id="scrape-dir")
-        yield Input(placeholder="ES-DE Gamelists Directory (Optional, leave blank to skip)", id="gamelist-dir")
-        
-        yield Horizontal(
-            Input(value="6", placeholder="Threads", id="threads", type="integer"),
-            Button("Start Scrape", id="start-btn", variant="primary")
-        )
+        yield Input(placeholder="ES-DE Gamelists Directory (Optional)", id="gamelist-dir")
 
 class TuiScraperApp(App):
     CSS = """
