@@ -25,7 +25,7 @@
 The easiest way to get started on Windows is to download the standalone executable:
 
 1.  Go to the [**Latest Releases**](https://github.com/ankimetho/mcScrapiscrape/releases) page.
-2.  Download `tui_scraper.exe`.
+2.  Download `mcscrapiscraper.exe`.
 3.  Run it! The **Config Wizard** will help you set up your credentials on first launch.
 
 ### 2. The Developer Way (Python Source)
@@ -41,7 +41,7 @@ cd mcScrapiscrape
 pip install -r requirements.txt
 
 # Launch the TUI
-python tui_scraper.py
+python mcscrapiscrape.py
 ```
 
 ---

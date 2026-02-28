@@ -21,6 +21,7 @@ from textual.widgets import (
     Select,
     SelectionList,
     DataTable,
+    DirectoryTree,
 )
 from textual.widgets.selection_list import Selection
 from textual import work
@@ -39,21 +40,69 @@ def resource_path(relative_path):
     return os.path.join(base_path, relative_path)
 
 
-def load_esde_systems():
+def load_system_mapping():
+    """Load the definitive ScreenScraper ID → ES-DE folder mapping."""
     mapping = {}
     try:
-        path = resource_path("systems.txt")
+        path = resource_path("system_mapping.json")
         if os.path.exists(path):
             with open(path, "r", encoding="utf-8") as f:
-                for line in f:
-                    if ":" in line:
-                        short, full = line.split(":", 1)
-                        # Normalize: lowercase and remove all non-alphanumeric
-                        clean_full = "".join(c for c in full.lower() if c.isalnum())
-                        mapping[clean_full] = short.strip().lower()
+                mapping = json.load(f)
     except Exception:
         pass
     return mapping
+
+
+class DirPickerModal(ModalScreen):
+    """A modal directory picker using DirectoryTree."""
+
+    def __init__(self, start_path: str = "/", target_input_id: str = ""):
+        super().__init__()
+        self.start_path = start_path if os.path.isdir(start_path) else os.path.expanduser("~")
+        self.target_input_id = target_input_id
+        self.selected_path = self.start_path
+
+    def compose(self) -> ComposeResult:
+        with Center():
+            with Vertical(id="dirpicker-card"):
+                yield Label(" 📂  SELECT DIRECTORY ", id="dirpicker-title")
+                with Horizontal(id="dirpicker-nav"):
+                    yield Button("⬆ PARENT", id="dirpicker-parent", variant="default")
+                    yield Input(value=self.start_path, id="dirpicker-path-input")
+                yield DirectoryTree(self.start_path, id="dirpicker-tree")
+                with Horizontal(id="dirpicker-actions"):
+                    yield Button("SELECT", variant="success", id="dirpicker-select")
+                    yield Button("CANCEL", variant="default", id="dirpicker-cancel")
+
+    def _reload_tree(self, new_path: str) -> None:
+        """Replace the DirectoryTree with one rooted at new_path."""
+        if not os.path.isdir(new_path):
+            return
+        self.selected_path = new_path
+        self.query_one("#dirpicker-path-input", Input).value = new_path
+        tree = self.query_one("#dirpicker-tree", DirectoryTree)
+        tree.path = new_path
+        tree.reload()
+
+    def on_directory_tree_directory_selected(self, event: DirectoryTree.DirectorySelected) -> None:
+        self.selected_path = str(event.path)
+        self.query_one("#dirpicker-path-input", Input).value = self.selected_path
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        if event.input.id == "dirpicker-path-input":
+            typed = event.value.strip()
+            if os.path.isdir(typed):
+                self._reload_tree(typed)
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "dirpicker-select":
+            self.dismiss((self.target_input_id, self.selected_path))
+        elif event.button.id == "dirpicker-parent":
+            parent = os.path.dirname(self.selected_path)
+            if parent and parent != self.selected_path:
+                self._reload_tree(parent)
+        else:
+            self.dismiss(None)
 
 
 class ConfigPanel(VerticalScroll):
@@ -78,9 +127,15 @@ class ConfigPanel(VerticalScroll):
             # ── Folders ──────────────────────────────────────────────────
             yield Static(" 📁  FOLDERS ", classes="section-header")
             yield Static("ROM & Media paths", classes="section-desc")
-            yield Input(placeholder="Root ROMs Dir", id="rom-dir")
-            yield Input(placeholder="Media Dir", id="scrape-dir")
-            yield Input(placeholder="Gamelists Dir (Opt)", id="gamelist-dir")
+            with Horizontal(classes="path-row"):
+                yield Input(placeholder="Root ROMs Dir", id="rom-dir")
+                yield Button("📂", id="browse-rom-dir", classes="browse-btn")
+            with Horizontal(classes="path-row"):
+                yield Input(placeholder="Media Dir", id="scrape-dir")
+                yield Button("📂", id="browse-scrape-dir", classes="browse-btn")
+            with Horizontal(classes="path-row"):
+                yield Input(placeholder="Gamelists Dir (Opt)", id="gamelist-dir")
+                yield Button("📂", id="browse-gamelist-dir", classes="browse-btn")
 
             # ── Performance ──────────────────────────────────────────────
             yield Static(" ⚡  PERFORMANCE ", classes="section-header")
@@ -108,43 +163,13 @@ class SelectionPanel(VerticalScroll):
                 yield Button("DESELECT ALL", id="deselect-all-systems", variant="default")
             
             system_selections = []
-            esde_map = load_esde_systems()
-            try:
-                path = resource_path("screenscraper_system_ids.json")
-                with open(path, "r") as f:
-                    systems_data = json.load(f)
-                    for name_raw, eid in sorted(systems_data.items()):
-                        def clean(s):
-                            return "".join(c for c in s.lower() if c.isalnum())
-                        display_name = name_raw.title()
-                        name_clean = clean(name_raw)
-                        es_short = esde_map.get(name_clean)
-                        # ... mapping logic ... (reusing existing)
-                        if not es_short:
-                            for prefix in ["nintendo", "sega", "sony", "atari", "commodore", "nec", "snk", "bandai"]:
-                                if esde_map.get(prefix + name_clean):
-                                    es_short = esde_map.get(prefix + name_clean)
-                                    break
-                        if not es_short:
-                            for prefix in ["nintendo", "sega", "sony", "atari", "commodore", "nec", "snk", "bandai"]:
-                                if name_clean.startswith(prefix):
-                                    if esde_map.get(name_clean[len(prefix):]):
-                                        es_short = esde_map.get(name_clean[len(prefix):])
-                                        break
-                        if name_clean == "megadrive":
-                            es_short = "megadrive"
-                        if name_clean == "supernintendo":
-                            es_short = "snes"
-                        if name_clean == "gamecube":
-                            es_short = "gc"
-                        if name_clean == "playstation":
-                            es_short = "psx"
-                        
-                        label = f"{display_name}" + (f" [{es_short}]" if es_short else "")
-                        val = f"{eid}|{es_short or name_raw.lower()}"
-                        system_selections.append(Selection(label, val, False))
-            except Exception:
-                pass
+            sys_mapping = load_system_mapping()
+            for eid, info in sorted(sys_mapping.items(), key=lambda x: x[1]["display_name"]):
+                display_name = info["display_name"]
+                esde_folder = info["esde_folder"]
+                label = f"{display_name} [{esde_folder}]"
+                val = f"{eid}|{esde_folder}"
+                system_selections.append(Selection(label, val, False))
             yield SelectionList(*system_selections, id="systems-list")
 
             # ── Media types ──────────────────────────────────────────────
@@ -339,6 +364,72 @@ class TuiScraperApp(App):
         display: block;
     }
 
+    /* ── Path row (Input + Browse button) ── */
+    .path-row {
+        height: auto;
+        width: 1fr;
+        margin: 0 0 1 0;
+    }
+    .path-row Input {
+        width: 1fr;
+        margin: 0;
+    }
+    .browse-btn {
+        width: 5;
+        min-width: 5;
+        max-width: 5;
+        height: 3;
+        margin: 0 0 0 0;
+        border: tall $primary;
+    }
+
+    /* ── Dir Picker Modal ── */
+    DirPickerModal {
+        align: center middle;
+    }
+    #dirpicker-card {
+        width: 80;
+        height: 30;
+        background: $surface;
+        border: thick $primary;
+        padding: 1 2;
+    }
+    #dirpicker-title {
+        width: 1fr;
+        height: 3;
+        content-align: center middle;
+        text-style: bold;
+        background: $primary;
+        color: $text;
+        margin-bottom: 1;
+    }
+    #dirpicker-nav {
+        height: auto;
+        width: 1fr;
+        margin-bottom: 1;
+    }
+    #dirpicker-parent {
+        width: 12;
+        min-width: 12;
+        max-width: 12;
+        height: 3;
+    }
+    #dirpicker-nav Input {
+        width: 1fr;
+        margin: 0;
+    }
+    #dirpicker-tree {
+        height: 1fr;
+        border: tall $primary;
+        margin-bottom: 1;
+    }
+    #dirpicker-actions {
+        height: 3;
+    }
+    #dirpicker-actions Button {
+        width: 1fr;
+    }
+
     /* ── Wizard Styles ── */
     ConfigWizard {
         align: center middle;
@@ -475,6 +566,17 @@ class TuiScraperApp(App):
             self.query_one("#media-list", SelectionList).select_all()
         elif event.button.id == "deselect-all-media":
             self.query_one("#media-list", SelectionList).deselect_all()
+        elif event.button.id in ("browse-rom-dir", "browse-scrape-dir", "browse-gamelist-dir"):
+            target_id = event.button.id.replace("browse-", "")
+            current_val = self.get_input_value(target_id)
+            start = current_val if current_val and os.path.isdir(current_val) else os.path.expanduser("~")
+            self.push_screen(DirPickerModal(start_path=start, target_input_id=target_id), callback=self.handle_dir_picker)
+
+    def handle_dir_picker(self, result) -> None:
+        """Called when the directory picker modal is dismissed."""
+        if result is not None:
+            target_id, selected_path = result
+            self.query_one(f"#{target_id}", Input).value = selected_path
 
     def auto_detect_systems(self):
         rom_dir = self.get_input_value("rom-dir")
@@ -853,6 +955,7 @@ class TuiScraperApp(App):
             update_thread_status(t_idx, f"[{system_name}] {rom_name}")
 
             base_name = os.path.splitext(rom_name)[0]
+            safe_log(f"    [DEBUG] Fetching {rom_name} with systemeid={system_eid} (system={system_name})")
             info = fetch_game_info(
                 rom_name, devid, devpassword, "mcScrapiscrape",
                 user, password, system_eid
@@ -882,10 +985,16 @@ class TuiScraperApp(App):
                             game_elem.remove(existing)
 
             response_data = info.get("response", {}) if info else {}
-            status = "Success" if (info and "jeu" in response_data) else "Not Found / Error"
+            error_msg = info.get("error") if isinstance(info, dict) else None
+            if error_msg:
+                status = f"Error: {error_msg}"
+            elif info and "jeu" in response_data:
+                status = "Success"
+            else:
+                status = "Not Found"
             safe_log(f"[{completed + 1}/{total_tasks}] [{system_name}] {rom_name}... {status}")
 
-            if not info or "jeu" not in response_data:
+            if error_msg or not info or "jeu" not in response_data:
                 with self.xml_lock:
                     ET.SubElement(game_elem, "name").text = base_name
                 update_progress()

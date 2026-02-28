@@ -51,18 +51,27 @@ def fetch_game_info(rom_name, devid, devpassword, softname, ssid, sspassword, sy
             data = json.loads(response.read().decode("utf-8"))
             return data
     except HTTPError as e:
+        body = ""
+        try:
+            body = e.read().decode("utf-8", errors="replace")[:200]
+        except Exception:
+            pass
         if e.code == 430:
-            print(f"  [!] HTTP 430: Quota exceeded or invalid credentials/softname for {rom_name}")
+            msg = f"HTTP 430: Quota exceeded or invalid credentials/softname"
         elif e.code == 404:
-            print(f"  [!] Game not found on Screenscraper: {rom_name}")
+            msg = f"Game not found on Screenscraper"
         elif e.code == 400:
-            print(f"  [!] HTTP 400: Bad Request (Likely missing systemeid or invalid auth params) for {rom_name}")
+            msg = f"HTTP 400: Bad Request (missing systemeid or invalid auth)"
+        elif e.code == 403:
+            msg = f"HTTP 403: Forbidden ({body.strip() or 'invalid developer credentials?'})"
         else:
-            print(f"  [!] HTTP {e.code} for {rom_name}: {e.reason}")
-        return None
+            msg = f"HTTP {e.code}: {e.reason}"
+        print(f"  [!] {msg} for {rom_name}")
+        return {"error": msg}
     except Exception as e:
-        print(f"  [!] Error fetching info for {rom_name}: {e}")
-        return None
+        msg = f"Error: {e}"
+        print(f"  [!] {msg} for {rom_name}")
+        return {"error": msg}
 
 
 def download_media(media_url, out_path):
