@@ -4,9 +4,11 @@ from xml.dom import minidom
 import concurrent.futures
 import threading
 import json
+import sys
 
 from textual.app import App, ComposeResult
-from textual.containers import Horizontal, VerticalScroll, Vertical
+from textual.containers import Horizontal, VerticalScroll, Vertical, Center
+from textual.screen import ModalScreen
 from textual.widgets import (
     Header,
     Footer,
@@ -28,11 +30,21 @@ from textual.worker import get_current_worker
 from scraper import fetch_game_info, download_media, MEDIA_MAPPING
 
 
+def resource_path(relative_path):
+    """ Get absolute path to resource, works for dev and for PyInstaller """
+    try:
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
+
+
 def load_esde_systems():
     mapping = {}
     try:
-        if os.path.exists("systems.txt"):
-            with open("systems.txt", "r", encoding="utf-8") as f:
+        path = resource_path("systems.txt")
+        if os.path.exists(path):
+            with open(path, "r", encoding="utf-8") as f:
                 for line in f:
                     if ":" in line:
                         short, full = line.split(":", 1)
@@ -88,14 +100,18 @@ class SelectionPanel(VerticalScroll):
                 yield Button("↓ SAVE", id="save-btn")
                 yield Button("↑ LOAD", id="load-btn")
 
-            # ── Systems list ─────────────────────────────────────────────
             yield Static(" 🎮  SYSTEMS ", classes="section-header")
             yield Static("Select systems", classes="section-desc")
+            
+            with Horizontal(classes="selection-actions"):
+                yield Button("SELECT ALL", id="select-all-systems", variant="default")
+                yield Button("DESELECT ALL", id="deselect-all-systems", variant="default")
             
             system_selections = []
             esde_map = load_esde_systems()
             try:
-                with open("screenscraper_system_ids.json", "r") as f:
+                path = resource_path("screenscraper_system_ids.json")
+                with open(path, "r") as f:
                     systems_data = json.load(f)
                     for name_raw, eid in sorted(systems_data.items()):
                         def clean(s):
@@ -134,6 +150,10 @@ class SelectionPanel(VerticalScroll):
             # ── Media types ──────────────────────────────────────────────
             yield Static(" 🖼  MEDIA ", classes="section-header")
             yield Static("Choose assets", classes="section-desc")
+
+            with Horizontal(classes="selection-actions"):
+                yield Button("SELECT ALL", id="select-all-media", variant="default")
+                yield Button("DESELECT ALL", id="deselect-all-media", variant="default")
             media_names = {
                 "box-2D": "Box 2D", "box-3D": "Box 3D", "screenmarquee": "Marquee",
                 "mixrbv2": "Mix Image", "ss": "Screenshot", "video": "Video",
@@ -145,6 +165,50 @@ class SelectionPanel(VerticalScroll):
             ]
             yield SelectionList(*media_selections, id="media-list")
 
+
+class ConfigWizard(ModalScreen):
+    """A centered modal for initial configuration."""
+
+    def compose(self) -> ComposeResult:
+        with Center():
+            with Vertical(id="wizard-card"):
+                yield Label(" 🚀  mcScrapiscrape INITIAL SETUP ", id="wizard-title")
+                yield Label(
+                    "It looks like you're starting fresh. Please provide your core settings to begin.",
+                    id="wizard-desc",
+                )
+
+                with VerticalScroll(id="wizard-inputs"):
+                    yield Label(" Screenscraper Credentials ", classes="wiz-section-label")
+                    yield Input(placeholder="Screenscraper Username", id="wiz-user")
+                    yield Input(
+                        placeholder="Screenscraper Password", password=True, id="wiz-password"
+                    )
+                    yield Input(placeholder="Developer ID", id="wiz-devid")
+                    yield Input(
+                        placeholder="Developer Password",
+                        password=True,
+                        id="wiz-devpassword",
+                    )
+
+                    yield Label(" Folder Paths ", classes="wiz-section-label")
+                    yield Input(
+                        placeholder="Root ROMs Dir (e.g. D:\\ROMs\\)", id="wiz-rom-dir"
+                    )
+                    yield Input(
+                        placeholder="Media Dir (e.g. D:\\ES-DE\\downloaded_media)", id="wiz-scrape-dir"
+                    )
+
+                with Horizontal(id="wizard-actions"):
+                    yield Button("SAVE & START", variant="success", id="wiz-save-btn")
+                    yield Button("SKIP", variant="default", id="wiz-skip-btn")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "wiz-save-btn":
+            # Pass data back or just dismiss with a signal
+            self.dismiss(True)
+        else:
+            self.dismiss(False)
 
 
 class TuiScraperApp(App):
@@ -195,10 +259,23 @@ class TuiScraperApp(App):
         margin: 0 0 1 0;
     }
 
-    #main-actions, #utility-actions, #thread-config {
+    #main-actions, #utility-actions, #thread-config, .selection-actions {
         height: auto;
         width: 1fr;
         margin: 0 0 1 0;
+    }
+
+    .selection-actions Button {
+        height: 1;
+        min-width: 0;
+        margin: 0;
+        border: none;
+        background: $surface;
+        text-style: underline;
+    }
+    .selection-actions Button:hover {
+        background: $primary;
+        color: $text;
     }
 
     Button {
@@ -261,6 +338,52 @@ class TuiScraperApp(App):
     DataTable.visible {
         display: block;
     }
+
+    /* ── Wizard Styles ── */
+    ConfigWizard {
+        align: center middle;
+    }
+    #wizard-card {
+        width: 70;
+        height: auto;
+        max-height: 40;
+        background: $surface;
+        border: thick $primary;
+        padding: 1 2;
+    }
+    #wizard-title {
+        width: 1fr;
+        height: 3;
+        content-align: center middle;
+        text-style: bold;
+        background: $primary;
+        color: $text;
+        margin-bottom: 1;
+    }
+    #wizard-desc {
+        color: $text-muted;
+        text-align: center;
+        height: auto;
+        margin-bottom: 1;
+    }
+    .wiz-section-label {
+        margin-top: 1;
+        text-style: bold;
+        color: $accent;
+    }
+    #wizard-inputs {
+        height: auto;
+        max-height: 25;
+        border: solid $primary 20%;
+        padding: 0 1;
+    }
+    #wizard-actions {
+        margin-top: 2;
+        height: 3;
+    }
+    #wizard-actions Button {
+        width: 1fr;
+    }
     """
 
     BINDINGS = [("q", "quit", "Quit")]
@@ -293,8 +416,41 @@ class TuiScraperApp(App):
         self.title = "mcScrapiscrape TUI"
         self.sub_title = "Press 'q' to quit"
 
-        # Auto-load config on startup
-        self.call_after_refresh(self.load_config_file)
+        # Auto-run startup logic
+        self.call_after_refresh(self.check_initial_config)
+
+    def check_initial_config(self) -> None:
+        """Handles first-run wizard or automatic loading and auditing."""
+        if not os.path.exists("config.json"):
+            # Show Wizard and handle result via callback
+            self.push_screen(ConfigWizard(), callback=self.handle_wizard_result)
+        else:
+            self.load_config_file()
+            self.run_startup_tasks()
+
+    def handle_wizard_result(self, result: bool) -> None:
+        """Called when the wizard is dismissed."""
+        if result:
+            # Wizard was saved, copy values from wizard to main UI
+            # Note: The wizard screen is still accessible during dismissal callback
+            wizard_screen = self.query_one(ConfigWizard)
+            self.query_one("#user", Input).value = wizard_screen.query_one("#wiz-user", Input).value
+            self.query_one("#password", Input).value = wizard_screen.query_one("#wiz-password", Input).value
+            self.query_one("#devid", Input).value = wizard_screen.query_one("#wiz-devid", Input).value
+            self.query_one("#devpassword", Input).value = wizard_screen.query_one("#wiz-devpassword", Input).value
+            self.query_one("#rom-dir", Input).value = wizard_screen.query_one("#wiz-rom-dir", Input).value
+            self.query_one("#scrape-dir", Input).value = wizard_screen.query_one("#wiz-scrape-dir", Input).value
+            
+            # Save it now
+            self.save_config_file()
+            self.run_startup_tasks()
+        else:
+            self.log_view.write_line("[!] Wizard skipped. Please configure manually.")
+
+    def run_startup_tasks(self) -> None:
+        """Runs the automated detect and check tasks."""
+        self.auto_detect_systems()
+        self.run_check_media_worker()
 
     async def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "start-btn":
@@ -311,6 +467,14 @@ class TuiScraperApp(App):
             self.save_config_file()
         elif event.button.id == "load-btn":
             self.load_config_file()
+        elif event.button.id == "select-all-systems":
+            self.query_one("#systems-list", SelectionList).select_all()
+        elif event.button.id == "deselect-all-systems":
+            self.query_one("#systems-list", SelectionList).deselect_all()
+        elif event.button.id == "select-all-media":
+            self.query_one("#media-list", SelectionList).select_all()
+        elif event.button.id == "deselect-all-media":
+            self.query_one("#media-list", SelectionList).deselect_all()
 
     def auto_detect_systems(self):
         rom_dir = self.get_input_value("rom-dir")
