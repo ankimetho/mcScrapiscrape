@@ -1,76 +1,89 @@
-# mcScrapiscrape
+# 🚀 mcScrapiscrape
 
-`mcScrapiscrape` is a fast, multi-threaded command-line tool written in Python to scrape video game metadata and media from [screenscraper.fr](https://www.screenscraper.fr/). It's specifically designed to format downloaded media and generate `gamelist.xml` files compatible with **EmulationStation Desktop Edition (ES-DE)** and other similar retro gaming frontends.
+**mcScrapiscrape** is a premium, multi-threaded video game scraper for [screenscraper.fr](https://www.screenscraper.fr/). Designed specifically for **EmulationStation Desktop Edition (ES-DE)** and other modern frontends, it combines lightning-fast performance with a sleek Terminal User Interface (TUI).
 
-## Features
+[![Latest Release](https://img.shields.io/github/v/release/ankimetho/mcScrapiscrape?style=flat-square&color=6200ea)](https://github.com/ankimetho/mcScrapiscrape/releases)
+[![Python Version](https://img.shields.io/badge/python-3.8+-blue?style=flat-square)](https://www.python.org/downloads/)
 
-- **Multi-threaded Scraping**: Uses concurrent threads to quickly download data and media.
-- **Media Downloading**: Downloads various media types (2D boxes, 3D boxes, marquees, mix images, and screenshots) and organizes them into the correct ES-DE folder structure.
-- **`gamelist.xml` Generation**: Automatically generates EmulationStation compatible XML files populated with game metadata (Name, Description, Release Date, Developer, Publisher, Genre, Players).
-- **Smart Resume**: Scans your ROMs and skips items that already have all their media downloaded, making it perfect for incremental scrapes.
+---
 
-## Requirements
+## ✨ Key Features
 
-- Python 3.x
-- A free account on [screenscraper.fr](https://www.screenscraper.fr/)
-- Screenscraper Developer API Credentials (`devid` and `devpassword`)
-- _(Optional)_ `textual` (For the graphical Terminal UI)
+- **⚡ Blazing Fast**: Multi-threaded architecture scrapes multiple games simultaneously.
+- **🧙 Config Wizard**: Interactive first-time setup guides you through your credentials and folder paths.
+- **🔍 Auto-Audit**: At startup, it automatically scans your ROM folders and identifies exactly what media is missing.
+- **🎮 Multi-System Support**: Select and scrape entire libraries across dozens of systems in one batch.
+- **🛠️ "Fix" Mode**: Smart re-scraping that specifically targets games with missing descriptions, ratings, or media files.
+- **📦 Standalone Executable**: No Python? No problem. Download the pre-built `.exe` and start scraping immediately.
 
-## Usage
+---
 
-You can use the scraper either via a graphical terminal interface (TUI) or entirely from the command line.
+## 🚀 Getting Started
 
-### Option 1: Graphical Terminal UI (TUI)
+### 1. The Easy Way (Standalone EXE)
 
-If you prefer a visual interface, you can run the TUI wrapper. First, install the requirements:
+The easiest way to get started on Windows is to download the standalone executable:
+
+1.  Go to the [**Latest Releases**](https://github.com/ankimetho/mcScrapiscrape/releases) page.
+2.  Download `tui_scraper.exe`.
+3.  Run it! The **Config Wizard** will help you set up your credentials on first launch.
+
+### 2. The Developer Way (Python Source)
+
+If you prefer running from source or are on Linux/macOS:
 
 ```bash
-pip install textual
-```
+# Clone the repository
+git clone https://github.com/ankimetho/mcScrapiscrape.git
+cd mcScrapiscrape
 
-Then, run:
+# Install dependencies
+pip install -r requirements.txt
 
-```bash
+# Launch the TUI
 python tui_scraper.py
 ```
 
-This will open a full-screen, interactive graphical window where you can input all your variables and click "Start Scrape" to watch the progress bar and live logs!
+---
 
-### Option 2: Command Line Interface (CLI)
+## 🎨 TUI Overview
+
+The Terminal User Interface is divided into three logical sections:
+
+1.  **Sidebar (Config)**: Manage your Screenscraper credentials, folder paths, and thread counts.
+2.  **Main Console**: Live logs and overall progress mapping across your current batch.
+3.  **Audit Center**: Detailed metadata view and multi-system selection list.
+
+### 💡 Pro Tips:
+
+- **Auto-Detect**: Put your ROMs in folders named after ES-DE shortnames (e.g., `snes`, `psx`, `megadrive`). Click **DETECT** to automatically select them.
+- **Check Media**: Use the **CHECK** button to perform a deep-scan of your local `gamelist.xml` and media folders to find gaps in your collection.
+- **Select All**: Need to scrape everything? Use the **SELECT ALL** toggles in the sidebar for quick system/media selection.
+
+---
+
+## 🔧 CLI Power Usage
+
+For advanced users or automation scripts, `scraper.py` can be used directly:
 
 ```bash
 python scraper.py \
-  --rom-dir "/path/to/roms/snes" \
-  --scrape-dir "/path/to/ES-DE/downloaded_media" \
+  --rom-dir "D:\ROMs\snes" \
+  --scrape-dir "D:\ES-DE\downloaded_media" \
   --system "snes" \
-  --user "your_screenscraper_username" \
-  --password "your_screenscraper_password" \
-  --devid "your_dev_id" \
-  --devpassword "your_dev_password" \
+  --user "my_username" \
+  --password "my_password" \
+  --devid "my_dev_id" \
+  --devpassword "my_dev_password" \
   --systemeid "4" \
-  --gamelist-dir "/path/to/ES-DE/gamelists" \
   --threads 6
 ```
 
-### Arguments
+---
 
-| Argument         | Description                                                                           | Required | Default            |
-| :--------------- | :------------------------------------------------------------------------------------ | :------: | :----------------- |
-| `--rom-dir`      | Path to the directory containing your game ROMs.                                      |   Yes    | -                  |
-| `--scrape-dir`   | Path to the `downloaded_media` directory for ES-DE.                                   |   Yes    | -                  |
-| `--system`       | System name (e.g., `snes`, `megadrive`). Used for folder naming.                      |   Yes    | -                  |
-| `--user`         | Your Screenscraper account username.                                                  |   Yes    | -                  |
-| `--password`     | Your Screenscraper account password.                                                  |   Yes    | -                  |
-| `--devid`        | Screenscraper Developer ID.                                                           |   Yes    | `""`               |
-| `--devpassword`  | Screenscraper Developer Password.                                                     |   Yes    | `""`               |
-| `--softname`     | Software name registered with Screenscraper.                                          |    No    | `"mcScrapiscrape"` |
-| `--gamelist-dir` | Output directory to generate the `gamelist.xml` file.                                 |    No    | `None`             |
-| `--systemeid`    | Screenscraper system ID (e.g., 4 for SNES). **Strongly recommended** to avoid errors. |    No    | `None`             |
-| `--threads`      | Number of concurrent fetch/download threads.                                          |    No    | `6`                |
+## 📂 Expected Structure
 
-## Folder Structure Output
-
-The tool expects and outputs the standard ES-DE directory layout:
+**mcScrapiscrape** adheres to the standard ES-DE folder hierarchy:
 
 ```text
 downloaded_media/
@@ -82,11 +95,17 @@ downloaded_media/
     └── screenshots/
 ```
 
-## Tips
+---
 
-- Always pass the `--systemeid` to avoid `HTTP 400 Bad Request` errors.
-- Do not set the thread count excessively high; screenscraper.fr enforces rate limits. Usually, the default of `6` threads provides a good balance.
+## ☁️ API Requirements
 
-## License
+You will need a account on [screenscraper.fr](https://www.screenscraper.fr/).
 
-This project is open-source and provided "as is".
+- **Username/Password**: Your standard login.
+- **Developer ID/Password**: Required to use the API at higher speeds. You can request these for free on the Screenscraper website.
+
+---
+
+## ⚖️ License & Disclaimer
+
+Provided "as is" under the MIT License. This tool is not affiliated with Screenscraper.fr or the ES-DE team. Please respect Screenscraper's API limits and terms of service.
