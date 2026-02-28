@@ -19,7 +19,11 @@ MEDIA_MAPPING = {
     "box-3D": ("3dboxes", "png"),
     "screenmarquee": ("marquees", "png"),
     "mixrbv2": ("miximages", "png"),
-    "ss": ("screenshots", "png")
+    "ss": ("screenshots", "png"),
+    "video": ("videos", "mp4"),
+    "wheel": ("wheels", "png"),
+    "fanart": ("fanart", "png"),
+    "manual": ("manuals", "pdf"),
 }
 
 def build_api_url(endpoint, params):
@@ -89,7 +93,90 @@ def main():
 
     args = parser.parse_args()
 
-    rom_exts = (".zip", ".sfc", ".nes", ".md", ".bin", ".iso", ".chd", ".smc", ".fig", ".pce", ".pce-cd", ".32x", ".ngp", ".ngpc", ".pcf", ".pcf-cd")   
+    rom_exts = (  # --- Nintendo ---
+            ".nes",
+            ".nez",
+            ".fc",
+            ".fds",  # NES / Famicom
+            ".sfc",
+            ".smc",
+            ".fig",  # SNES
+            ".z64",
+            ".v64",
+            ".n64",  # N64
+            ".gb",
+            ".gbc",
+            ".gba",  # GB / GBC / GBA
+            ".nds",
+            ".dsi",
+            ".srl",  # DS
+            ".3ds",
+            ".cci",  # 3DS
+            ".rvz",
+            ".wua",  # GameCube / Wii (Compressed)
+            ".vb",  # Virtual Boy
+            # --- Sega ---
+            ".md",
+            ".smd",
+            ".gen",  # Genesis / Mega Drive
+            ".32x",  # Sega 32X
+            ".sms",
+            ".gg",  # Master System / Game Gear
+            ".gdi",
+            ".cdi",  # Dreamcast
+            # --- Sony ---
+            ".pbp",
+            ".cso",  # PS1 / PSP (Compressed)
+            ".vpk",
+            ".psvita",  # PS Vita
+            # --- Atari & Other Handhelds ---
+            ".j64",
+            ".jag",
+            ".abs",
+            ".cof",  # Jaguar
+            ".lnx",  # Lynx
+            ".a26",
+            ".a52",
+            ".a78",  # Atari 2600/5200/7800
+            ".ws",
+            ".wsc",  # WonderSwan / Color
+            ".pce",
+            ".sgx",  # TurboGrafx-16 / PC Engine
+            ".ngp",
+            ".ngc",  # Neo Geo Pocket / Color
+            # --- Computers ---
+            ".d64",
+            ".prg",
+            ".tap",
+            ".t64",  # Commodore 64
+            ".hdi",
+            ".fdi",
+            ".d98",  # PC-98
+            ".dim",
+            ".hdm",
+            ".d88",  # Sharp X68000
+            ".dat",  # Neo Geo / Arcade Metadata
+            # --- Disc Images (Crucial) ---
+            ".iso",
+            ".bin",
+            ".cue",
+            ".img",  # Standard Disc Formats
+            ".chd",  # MAME/PS1/PS2/Saturn/CD Compressed
+            ".ccd",
+            ".nrg",
+            ".mds",  # CloneCD / Nero / Alcohol 120%
+            # --- Archives & Patches ---
+            ".zip",
+            ".7z",
+            ".rar",
+            ".lha",  # Compressed Archives
+            ".ips",
+            ".ups",
+            ".bps",
+            ".xdelta",  # ROM Hacks / Patches
+            ".rom",
+            ".bin",
+        )
     roms = []
     if os.path.exists(args.rom_dir):
         for f in os.listdir(args.rom_dir):
@@ -197,6 +284,12 @@ def main():
             players = jeu.get("joueurs", {}).get("text", "1")
         except:
             players = "1"
+
+        try:
+            rating_raw = jeu.get("note", {}).get("text", "0")
+            rating = str(float(rating_raw) / 20.0) if rating_raw.isdigit() else "0"
+        except:
+            rating = "0"
             
         # Add properties to XML
         with xml_lock:
@@ -212,6 +305,8 @@ def main():
                 ET.SubElement(game_elem, "genre").text = genre
             if players:
                 ET.SubElement(game_elem, "players").text = str(players)
+            if rating != "0":
+                ET.SubElement(game_elem, "rating").text = rating
             
         # Download media
         try:
@@ -251,11 +346,20 @@ def main():
                                 "box-2D": "image",       # In ES-DE, covers go into <image>
                                 "box-3D": "thumbnail",   # 3dboxes go into <thumbnail>
                                 "screenmarquee": "marquee", # marquees into <marquee>
+                                "video": "video",
+                                "wheel": "marquee",      # Some prefer wheel as marquee
+                                "fanart": "fanart",
+                                "ss": "image",           # If no box-2D, ss can be primary image, but let's be careful
                             }
+                            # Priority mapping: if we already have it, maybe don't overwrite?
+                            # Usually we just append or replace.
                             node_tag = tag_mapping.get(m_type)
                             if node_tag:
                                 with xml_lock:
-                                    ET.SubElement(game_elem, node_tag).text = relative_es_path
+                                    # Check if tag already exists
+                                    existing = game_elem.find(node_tag)
+                                    if existing is None:
+                                        ET.SubElement(game_elem, node_tag).text = relative_es_path
                                 
         except Exception as e:
             with print_lock:
